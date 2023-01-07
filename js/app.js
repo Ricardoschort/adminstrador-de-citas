@@ -1,3 +1,4 @@
+let DB
 //variables
 const nombreInput = document.querySelector("#mascota");
 const propietarioInput = document.querySelector("#propietario");
@@ -9,6 +10,12 @@ const sintomasInput = document.querySelector("#sintomas");
 const formulario = document.querySelector("#nueva-cita");
 const citasContenedor = document.querySelector("#citas");
 let editando;
+
+
+document.addEventListener("DOMContentLoaded",()=>{
+  crearDB()
+  
+})
 
 // objeto
 const citaObj ={
@@ -43,7 +50,7 @@ class GenerarCitas{
 
   agregarCitas(cita){
     this.citas = [...this.citas,cita];
-    visual.añadirCitasHtml(this.citas);
+   
   }
 
   borrarCitaOBj(id){
@@ -52,7 +59,8 @@ class GenerarCitas{
 
   actualizarCita(citaActulizada){
     this.citas = this.citas.map( citas => citas.id === citaActulizada.id ? citaActulizada : citas );
-    visual.añadirCitasHtml(this.citas);
+    
+  
      }
  
 }
@@ -80,40 +88,53 @@ class Ui{
   
   }
  
-  añadirCitasHtml(citas){
+  añadirCitasHtml(){
     this.limpiarhtml();
-    citas.forEach(cita => {
-      const {mascota,propietario,telefono,fecha,hora,sintomas,id} = cita
-      const citaContent = document.createElement("div");
-      citaContent.classList.add("mt-5")
-      citaContent.innerHTML =
-      `
-      <h2 class=" font-weight-bolder title-card tittle">${mascota}  </h2>
-      <p> <span class=" font-weight-bolder">Propietario: </span>${propietario}</p>
-      <p> <span class=" font-weight-bolder">Telefono: </span>${telefono}</p>
-      <p> <span class=" font-weight-bolder">Fecha: </span>${fecha}</p>
-      <p> <span class=" font-weight-bolder">Hora: </span>${hora}</p>
-      <p> <span class=" font-weight-bolder">Sintomas: </span>${sintomas}</p>
     
-      
-      `
-      const btnBorrar = document.createElement("button");
-      btnBorrar.classList.add("btn","btn-borrar","btn-danger","mr-2")
-      btnBorrar.innerText = "eliminar"
-      btnBorrar.onclick = () => borrarCita(id)
-      citaContent.appendChild(btnBorrar);
-      citasContenedor.appendChild(citaContent)
+    // lleer bade datos
 
-      // boton para editar
-      const btnEditar = document.createElement("button");
-      btnEditar.classList.add("btn","btn-info")
-      btnEditar.innerText= "editar"
-      btnEditar.onclick =()=> cargarEdicion(cita);
-      citaContent.appendChild(btnEditar);
-      citasContenedor.appendChild(citaContent)
+    const objectStore = DB.transaction("citas").objectStore("citas");
+    
+    
+    objectStore.openCursor().onsuccess = function(e){
+      const cursor = e.target.result
+      if (cursor) {
+       
+          const {mascota,propietario,telefono,fecha,hora,sintomas,id} = cursor.value
+          const citaContent = document.createElement("div");
+          citaContent.classList.add("mt-5")
+          citaContent.innerHTML =
+          `
+          <h2 class=" font-weight-bolder title-card tittle">${mascota}  </h2>
+          <p> <span class=" font-weight-bolder">Propietario: </span>${propietario}</p>
+          <p> <span class=" font-weight-bolder">Telefono: </span>${telefono}</p>
+          <p> <span class=" font-weight-bolder">Fecha: </span>${fecha}</p>
+          <p> <span class=" font-weight-bolder">Hora: </span>${hora}</p>
+          <p> <span class=" font-weight-bolder">Sintomas: </span>${sintomas}</p>
+        
+          
+          `
+          const btnBorrar = document.createElement("button");
+          btnBorrar.classList.add("btn","btn-borrar","btn-danger","mr-2")
+          btnBorrar.innerText = "eliminar"
+          btnBorrar.onclick = () => borrarCita(id)
+          citaContent.appendChild(btnBorrar);
+          citasContenedor.appendChild(citaContent)
+    
+          // boton para editar
+          const btnEditar = document.createElement("button");
+          btnEditar.classList.add("btn","btn-info")
+          btnEditar.innerText= "editar"
+          const cita = cursor.value
+          btnEditar.onclick =()=> cargarEdicion(cita);
+          citaContent.appendChild(btnEditar);
+          citasContenedor.appendChild(citaContent)
+        
 
-    });
-  }
+        cursor.continue()
+      }
+    };
+  } 
 
   limpiarhtml(){
     while(citasContenedor.firstChild){
@@ -148,20 +169,36 @@ function validarForm(e){
   }
 
   if(editando){
-    visual.mostrarAlerta("Editado correctamente")
-
-    crearCita.actualizarCita({...citaObj});
     
-    document.querySelector('button[type="submit"]').textContent = "crear cita"
-   
+    crearCita.actualizarCita({...citaObj});
 
-    editando = false;
+    const transaction = DB.transaction("citas", "readwrite");
+    const objectStore = transaction.objectStore("citas")
+    objectStore.put(citaObj);
+    
+    transaction.oncomplete = function (){
+      document.querySelector('button[type="submit"]').textContent = "crear cita"
+      visual.mostrarAlerta("Editado correctamente")
+      location.reload();
+      editando = false;
+    }
+   
   }else{
     // generar un id
     citaObj.id = Date.now();
   
     crearCita.agregarCitas({...citaObj});
-    visual.mostrarAlerta("Se agrego correctamente")
+
+    const transaction = DB.transaction("citas", "readwrite");
+    const objectStore = transaction.objectStore("citas")
+    objectStore.add(citaObj)
+
+    transaction.oncomplete = function () {
+      visual.mostrarAlerta("Se agrego correctamente")
+      visual.añadirCitasHtml()
+    }
+
+    
    
   }
   
@@ -184,18 +221,22 @@ function reinicarObj(){
 }
 
 function borrarCita(id){
-  //eliminar del arreglo
-  crearCita.borrarCitaOBj(id)
 
-  //borrando del html
-  const {citas} = crearCita
-  visual.añadirCitasHtml(citas);
- 
-  //mensaje
-  visual.mostrarAlerta("eliminado correctamente")
+  const transaction = DB.transaction("citas", "readwrite");
+  const objectStore = transaction.objectStore("citas")
+  objectStore.delete(id);
+  transaction.oncomplete = function(){
+
+ //mensaje
+    visual.mostrarAlerta("eliminado correctamente")
+    visual.añadirCitasHtml();
+  } 
 }
 
+
+
 function cargarEdicion(cita){
+  
   const {mascota,propietario,telefono,fecha,hora,sintomas,id} = cita
 
   nombreInput.value = mascota;
@@ -213,8 +254,39 @@ function cargarEdicion(cita){
   citaObj.sintomas= sintomas;
   citaObj.id = id
 
-  document.querySelector(".btn-borrar").disabled = true;
+
   document.querySelector('button[type="submit"]').textContent = "Guardar Datos"
   editando = true;
 
+}
+function crearDB(){
+  const citasBD = window.indexedDB.open("citas",1.0)
+
+  citasBD.onerror = function(){
+    console.log("hubo un error al crear la base de datos");
+  }
+
+  citasBD.onsuccess = function(){
+    DB = citasBD.result;
+    visual.añadirCitasHtml();
+  }
+
+  citasBD.onupgradeneeded = function(e){
+    const db = e.target.result
+
+    const objectStore = db.createObjectStore("citas",{
+      keyPath: "id",
+      autoIncrement:true
+    })
+
+    objectStore.createIndex("mascota","mascota",{unique:false})
+    objectStore.createIndex("propietario","propietario",{unique:false})
+    objectStore.createIndex("telefono","fecha",{unique:false})
+    objectStore.createIndex("hora","hora",{unique:false})
+    objectStore.createIndex("sintomas","sintomas",{unique:false})
+    objectStore.createIndex("id","id",{unique:true})
+
+
+  }
+  
 }
