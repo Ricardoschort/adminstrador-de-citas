@@ -102,7 +102,7 @@ class Ui{
        
           const {mascota,propietario,telefono,fecha,hora,sintomas,id} = cursor.value
           const citaContent = document.createElement("div");
-          citaContent.classList.add("mt-5")
+          citaContent.classList.add("mt-5","card","p-4","shadow")
           citaContent.innerHTML =
           `
           <h2 class=" font-weight-bolder title-card tittle">${mascota}  </h2>
@@ -115,7 +115,7 @@ class Ui{
           
           `
           const btnBorrar = document.createElement("button");
-          btnBorrar.classList.add("btn","btn-borrar","btn-danger","mr-2")
+          btnBorrar.classList.add("btn","btn-borrar","btn-danger","my-3")
           btnBorrar.innerText = "eliminar"
           btnBorrar.onclick = () => borrarCita(id)
           citaContent.appendChild(btnBorrar);
